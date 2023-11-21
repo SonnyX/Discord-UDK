@@ -80,7 +80,6 @@ const UDK_KNOWN_HASH: [u8; 32] = [
 static mut UDK_SLICE: Option<&'static [u8]> = None;
 
 /// Return a slice of UDK.exe
-#[cfg(target_arch = "x86_64")]
 pub fn get_udk_slice() -> &'static [u8] {
     // SAFETY: This is only touched once in DllMain.
     unsafe { UDK_SLICE.unwrap() }
