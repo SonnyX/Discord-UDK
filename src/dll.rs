@@ -35,13 +35,13 @@ pub fn dll_main(_hinst_dll: HINSTANCE, fdw_reason: u32, _lpv_reserved: usize) ->
 /// hooks if the UDK matches our known hash.
 fn dll_attach() {
     let process = unsafe { GetCurrentProcess() };
-    let module = unsafe { GetModuleHandleA(None) }.expect("Couldn't get Module Handle for the UDK process");
+    let module: windows::Win32::Foundation::HMODULE = unsafe { GetModuleHandleA(None) }.expect("Couldn't get Module Handle for the UDK process");
 
-    let exe_slice = get_module_slice(&get_module_information(process, module).expect("Failed to get module information for UDK"));
+    let exe_slice = get_module_slice(&get_module_information(process, module.into()).expect("Failed to get module information for UDK"));
 
     // Now that we're attached, let's hash the UDK executable.
     // If the hash does not match what we think it should be, do not attach detours.
-    let exe_filename = get_module_filename(process, module).unwrap();
+    let exe_filename = get_module_filename(process, module.into()).unwrap();
 
     let mut exe = std::fs::File::open(exe_filename).unwrap();
     let hash = {

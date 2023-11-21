@@ -21,7 +21,7 @@ pub struct Client {
 pub async fn make_client(subs: discord_sdk::Subscriptions) -> Result<Client, Error> {
     let (wheel, handler) = discord_sdk::wheel::Wheel::new(Box::new(|err| {
         tracing::error!(error = ?err, "encountered an error while trying to create a discord connection");
-        log(crate::udk_log::LogType::Warning, "encountered an error while trying to create a discord connection");
+        log(crate::udk_log::LogType::Error, "encountered an error while trying to create a discord connection");
     }));
 
     let mut user = wheel.user();
@@ -42,7 +42,7 @@ pub async fn make_client(subs: discord_sdk::Subscriptions) -> Result<Client, Err
 
         if let Err(error) = timed_out {
             tracing::warn!("Failed to connect, shutting down discord!");
-            log(crate::udk_log::LogType::Warning, "Failed to connect, shutting down discord!");
+            log(crate::udk_log::LogType::Error, "Failed to connect, shutting down discord!");
             discord.disconnect().await;
             return Err(Error::DiscordError(format!("{:?}", error)))
         } else {
@@ -56,13 +56,13 @@ pub async fn make_client(subs: discord_sdk::Subscriptions) -> Result<Client, Err
 
         if let Err(error) = user {
             tracing::warn!("Failed to connect, shutting down discord!");
-            log(crate::udk_log::LogType::Warning, &format!("Failed to connect, shutting down discord! Error: {}", error));
+            log(crate::udk_log::LogType::Error, &format!("Failed to connect, shutting down discord! Error: {}", error));
             discord.disconnect().await;
             return Err(Error::DiscordError(error))
         } else if let Ok(user) = user {
             unsafe { IS_INITIALIZED = true };
             tracing::info!("connected to Discord, local user is {:#?}", user);
-            log(crate::udk_log::LogType::Warning, &format!("connected to Discord, local user is {:#?}", user));
+            log(crate::udk_log::LogType::Init, &format!("connected to Discord, local user is {:#?}", user));
 
             return Ok(Client {
                 discord,
@@ -85,7 +85,7 @@ pub async fn start_discord_rpc() -> Result<(), Error> {
     tokio::task::spawn(async move {
         while let Ok(ae) = activity_events.0.recv().await {
             tracing::info!(event = ?ae, "received activity event");
-            log(crate::udk_log::LogType::Warning, "received activity event");
+            log(crate::udk_log::LogType::Info, "received activity event");
         }
     });
 
@@ -131,7 +131,7 @@ pub async fn update_presence(in_server_name: String, in_level_name: String, in_p
 
         let client = get_discord_client();
         let info = client.discord.update_activity(rp).await;
-        log(crate::udk_log::LogType::Warning, &format!("updated activity: {:?}", &info));
+        log(crate::udk_log::LogType::Info, &format!("updated activity: {:?}", &info));
         tracing::info!("updated activity: {:?}", &info);
         return Ok(());
     }
@@ -161,7 +161,7 @@ pub async fn update_presence(in_server_name: String, in_level_name: String, in_p
 
     let client = get_discord_client();
     let info = client.discord.update_activity(rp).await;
-    log(crate::udk_log::LogType::Warning, &format!("updated activity: {:?}", &info));
+    log(crate::udk_log::LogType::Info, &format!("updated activity: {:?}", &info));
     tracing::info!("updated activity: {:?}", &info);
     Ok(())
 }
@@ -178,7 +178,7 @@ pub extern "C" fn UpdateDiscordRPC(in_server_name_ptr: *const u16, in_level_name
     let in_server_name = unsafe { U16CStr::from_ptr_str(in_server_name_ptr) }.to_string_lossy();
     let in_level_name = unsafe { U16CStr::from_ptr_str(in_level_name_ptr) }.to_string_lossy();
     let in_image_name = unsafe { U16CStr::from_ptr_str(in_image_name_ptr) }.to_string_lossy();
-    log(crate::udk_log::LogType::Warning, &format!("UpdateDiscordRPC, {}, {}, {}, {}, {}, {}, {}, {}, {}", in_server_name, in_level_name, in_player_count, in_max_players, in_team_num, in_time_elapsed, in_time_remaining, is_firestorm, in_image_name));
+    log(crate::udk_log::LogType::Info, &format!("UpdateDiscordRPC, {}, {}, {}, {}, {}, {}, {}, {}, {}", in_server_name, in_level_name, in_player_count, in_max_players, in_team_num, in_time_elapsed, in_time_remaining, is_firestorm, in_image_name));
 
     let team = match in_team_num {
         0 => "GDI",
