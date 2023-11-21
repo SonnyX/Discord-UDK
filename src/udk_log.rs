@@ -13,7 +13,7 @@ const DEBUG_FN_OFFSET: usize = 0x0024_6A20;
 const DEBUG_LOG_OFFSET: usize = 0x029a_31a8;
 /// Address of UDK's log function.
 #[cfg(target_arch = "x86")]
-const DEBUG_FN_OFFSET: usize = 0x0050_78b0;
+const DEBUG_FN_OFFSET: usize = 0x0002_1c500;
 
 /// This is the type signature of UDK's log function.
 type UDKLogFn = unsafe extern "C" fn(usize, u32, *const widestring::WideChar);
