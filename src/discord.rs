@@ -6,9 +6,6 @@ use std::time::Duration;
 use crate::error::Error;
 
 use crate::udk_log::log;
-use discord_sdk;
-use tokio;
-use tracing;
 
 pub const APP_ID: discord_sdk::AppId = 846947824888709160;
 
@@ -44,7 +41,7 @@ pub async fn make_client(subs: discord_sdk::Subscriptions) -> Result<Client, Err
             tracing::warn!("Failed to connect, shutting down discord!");
             log(crate::udk_log::LogType::Error, "Failed to connect, shutting down discord!");
             discord.disconnect().await;
-            return Err(Error::DiscordError(format!("{:?}", error)))
+            return Err(Error::Discord(format!("{:?}", error)))
         } else {
             timed_out??;
         }
@@ -58,7 +55,7 @@ pub async fn make_client(subs: discord_sdk::Subscriptions) -> Result<Client, Err
             tracing::warn!("Failed to connect, shutting down discord!");
             log(crate::udk_log::LogType::Error, &format!("Failed to connect, shutting down discord! Error: {}", error));
             discord.disconnect().await;
-            return Err(Error::DiscordError(error))
+            Err(Error::Discord(error))
         } else if let Ok(user) = user {
             unsafe { IS_INITIALIZED = true };
             tracing::info!("connected to Discord, local user is {:#?}", user);
@@ -70,10 +67,10 @@ pub async fn make_client(subs: discord_sdk::Subscriptions) -> Result<Client, Err
                 wheel,
             });
         } else {
-            return Err(Error::DiscordError(format!("Could not connect to discord, failed to retrieve current discord user")));
+            Err(Error::Discord("Could not connect to discord, failed to retrieve current discord user".to_string()))
         }
     } else {
-        return Err(Error::DiscordError(format!("Could not create discord client")));
+        Err(Error::Discord("Could not create discord client".to_string()))
     }
 }
 
@@ -113,7 +110,7 @@ pub async fn update_presence(in_server_name: String, in_level_name: String, in_p
         tracing::warn!("Initialized discord RPC");
     } else if unsafe { !IS_INITIALIZED && CLIENT.is_some() } {
         tracing::error!("Client exists, yet we're not initialized yet!");
-        return Err(Error::DiscordError("Client exists, yet we're not initialized yet!".to_string()))
+        return Err(Error::Discord("Client exists, yet we're not initialized yet!".to_string()))
     }
 
     if in_level_name == "FrontEndMap" {

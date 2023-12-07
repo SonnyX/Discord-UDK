@@ -1,3 +1,7 @@
+use std::os::windows::fs::FileExt;
+use std::{ops::Range, fs::File};
+use std::sync::OnceLock;
+
 use sha2::{Digest, Sha256};
 
 use windows::{
@@ -28,7 +32,7 @@ pub fn dll_main(_hinst_dll: HINSTANCE, fdw_reason: u32, _lpv_reserved: usize) ->
         _ => return 0,
     }
 
-    return 1;
+    1
 }
 
 /// Called upon DLL attach. This function verifies the UDK and initializes
@@ -37,16 +41,28 @@ fn dll_attach() {
     let process = unsafe { GetCurrentProcess() };
     let module: windows::Win32::Foundation::HMODULE = unsafe { GetModuleHandleA(None) }.expect("Couldn't get Module Handle for the UDK process");
 
-    let exe_slice = get_module_slice(&get_module_information(process, module.into()).expect("Failed to get module information for UDK"));
+    let exe_information = get_module_information(process, module.into()).expect("Failed to get module information for UDK");
+    let udk_range = Range {
+        start: exe_information.lpBaseOfDll as usize,
+        end: exe_information.lpBaseOfDll as usize + exe_information.SizeOfImage as usize,
+    };
 
     // Now that we're attached, let's hash the UDK executable.
     // If the hash does not match what we think it should be, do not attach detours.
     let exe_filename = get_module_filename(process, module.into()).unwrap();
 
-    let mut exe = std::fs::File::open(exe_filename).unwrap();
+	let filemap = pelite::FileMap::open(&exe_filename).unwrap();
+	let pefile = pelite::PeFile::from_bytes(&filemap).unwrap();
+	let section = pefile.section_headers().by_name(".text").unwrap();
+    let range = section.file_range();
+
+    let f = File::open(exe_filename).unwrap();
+    let mut buf = vec![0; (range.end - range.start) as usize];
+    f.seek_read(&mut buf, range.start as u64).unwrap();
+
     let hash = {
         let mut sha = Sha256::new();
-        std::io::copy(&mut exe, &mut sha).unwrap();
+        sha.update(&buf);
         sha.finalize()
     };
 
@@ -56,33 +72,30 @@ fn dll_attach() {
     }
 
     // Cache the UDK slice.
-    unsafe {
-        UDK_SLICE = Some(exe_slice.as_ref().unwrap());
-    }
+    UDK_RANGE.set(udk_range).unwrap();
 }
 
 #[cfg(target_arch = "x86_64")]
 const UDK_KNOWN_HASH: [u8; 32] = [
-    0x0D, 0xE6, 0x90, 0x31, 0xEA, 0x41, 0x01, 0xF2, 0x18, 0xB6, 0x61, 0x27, 0xFD, 0x14, 0x3A, 0x8E,
-    0xC3, 0xF7, 0x48, 0x3E, 0x31, 0x9C, 0x3D, 0x8D, 0xD5, 0x1F, 0xA2, 0x8D, 0x7C, 0xBF, 0x08, 0xF5,
+    0xF0, 0x2F, 0x13, 0x1E, 0xF2, 0xE, 0xA3, 0xCE, 0xD1, 0xCE, 0x93, 0x14, 0x53, 0xDE, 0x37, 0xB9,
+    0x51, 0x1B, 0x92, 0xD0, 0xBA, 0x7C, 0x7, 0x27, 0x5B, 0xA0, 0xAE, 0xFB, 0x7D, 0xFB, 0xE3, 0xE3
 ];
 
 #[cfg(target_arch = "x86")]
 const UDK_KNOWN_HASH: [u8; 32] = [
-    0xEF, 0xAF, 0xBA, 0x91, 0xD3, 0x05, 0x2D, 0x07, 0x07, 0xDD, 0xF2, 0xF2, 0x14, 0x15, 0x00, 0xFA,
-    0x6C, 0x1E, 0x8F, 0x9E, 0xF0, 0x70, 0x40, 0xB8, 0xF9, 0x96, 0x73, 0x8A, 0x00, 0xFB, 0x90, 0x07,
+    0x70, 0xC2, 0x91, 0x73, 0xE0, 0x0F, 0x2F, 0xCA, 0x5E, 0xBB, 0x92, 0x76, 0x00, 0x43, 0xDF, 0x70,
+    0xE0, 0xC0, 0x16, 0xFA, 0xB2, 0x80, 0xF8, 0x20, 0x88, 0x31, 0xD9, 0x99, 0xFE, 0xF0, 0xFF, 0x33
 ];
 
-/// Cached slice of UDK.exe. This is only touched once upon init, and
-/// never written again.
-// FIXME: The slice is actually unsafe to access; sections of memory may be unmapped!
-// We should use a raw pointer slice instead (if ergonomics permit doing so).
-static mut UDK_SLICE: Option<&'static [u8]> = None;
+/// Cached memory range for UDK.exe
+pub static UDK_RANGE: OnceLock<Range<usize>> = OnceLock::new();
 
-/// Return a slice of UDK.exe
-pub fn get_udk_slice() -> &'static [u8] {
-    // SAFETY: This is only touched once in DllMain.
-    unsafe { UDK_SLICE.unwrap() }
+/// Return the base pointer for UDK.exe
+pub fn get_udk_ptr() -> *const u8 {
+    let range = UDK_RANGE.get().unwrap();
+
+    // TODO: Once Rust gets better raw slice support, we should return a `*const [u8]` instead.
+    range.start as *const u8
 }
 
 /// Wrapped version of the Win32 GetModuleFileName.
@@ -122,9 +135,4 @@ fn get_module_information(process: HANDLE, module: HINSTANCE) -> windows::core::
         true => Ok(module_info),
         false => Err(Error::from_win32()),
     }
-}
-
-/// Create a raw slice from a MODULEINFO structure.
-fn get_module_slice(info: &MODULEINFO) -> *const [u8] {
-    core::ptr::slice_from_raw_parts(info.lpBaseOfDll as *const u8, info.SizeOfImage as usize)
 }

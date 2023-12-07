@@ -1,5 +1,5 @@
 //! This module contains functionality relevant to UDK logging.
-use crate::dll::get_udk_slice;
+use crate::dll::get_udk_ptr;
 
 /// Offset from the beginning of UDK64.exe to the debug log object.
 #[cfg(target_arch = "x86_64")]
@@ -456,9 +456,9 @@ pub enum LogType {
 
 /// Log a message via the UDK logging framework.
 pub fn log(typ: LogType, msg: &str) {
-    let udk_slice = get_udk_slice();
-    let log_obj = unsafe { udk_slice.as_ptr().add(DEBUG_LOG_OFFSET) };
-    let log_fn: UDKLogFn = unsafe { std::mem::transmute(udk_slice.as_ptr().add(DEBUG_FN_OFFSET)) };
+    let udk_ptr = get_udk_ptr();
+    let log_obj = unsafe { udk_ptr.add(DEBUG_LOG_OFFSET) };
+    let log_fn: UDKLogFn = unsafe { std::mem::transmute(udk_ptr.add(DEBUG_FN_OFFSET)) };
 
     // Convert the UTF-8 Rust string into an OS wide string.
     let wmsg: widestring::U16CString = widestring::WideCString::from_str(format!("discord.dll: {}", msg)).unwrap();
