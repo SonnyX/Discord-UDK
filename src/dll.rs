@@ -9,7 +9,7 @@ use windows::{
         Foundation::{HANDLE, HINSTANCE},
         System::{
             LibraryLoader::GetModuleHandleA,
-            ProcessStatus::{K32GetModuleFileNameExW, K32GetModuleInformation, MODULEINFO},
+            ProcessStatus::{K32GetModuleInformation, MODULEINFO},
             SystemServices::{
                 DLL_PROCESS_ATTACH, DLL_PROCESS_DETACH, DLL_THREAD_ATTACH, DLL_THREAD_DETACH
             },
@@ -49,7 +49,7 @@ fn dll_attach() {
 
     // Now that we're attached, let's hash the UDK executable.
     // If the hash does not match what we think it should be, do not attach detours.
-    let exe_filename = get_module_filename(process, module.into()).unwrap();
+    let exe_filename = std::env::current_exe().unwrap();
 
 	let filemap = pelite::FileMap::open(&exe_filename).unwrap();
 	let pefile = pelite::PeFile::from_bytes(&filemap).unwrap();
@@ -96,25 +96,6 @@ pub fn get_udk_ptr() -> *const u8 {
 
     // TODO: Once Rust gets better raw slice support, we should return a `*const [u8]` instead.
     range.start as *const u8
-}
-
-/// Wrapped version of the Win32 GetModuleFileName.
-fn get_module_filename(process: HANDLE, module: HINSTANCE) -> windows::core::Result<String> {
-    // Use a temporary buffer the size of MAX_PATH for now.
-    // TODO: Dynamic allocation for longer filenames. As of now, this will truncate longer filenames.
-    let mut buf = [0u16; 256];
-
-    let len = unsafe {
-        K32GetModuleFileNameExW(process, module, &mut buf)
-    } as usize;
-
-    if len == 0 {
-        // Function failed.
-        
-        return Err(Error::from_win32());
-    }
-
-    Ok(String::from_utf16_lossy(&buf[..len]))
 }
 
 /// Wrapped version of the Win32 GetModuleInformation.
