@@ -27,6 +27,11 @@ features = [
   "Win32_System_Diagnostics_Debug"
   ]
 
+[features]
+default = ["renegadex"]
+renegadex = []
+firestorm = []
+
 [profile.release]
 opt-level = 'z'
 strip = true

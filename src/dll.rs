@@ -19,7 +19,26 @@ use windows::{
     core::Error,
 };
 
-pub fn dll_main(_hinst_dll: HINSTANCE, fdw_reason: u32, _lpv_reserved: usize) -> i32 {
+
+static mut INITIALIZED_BIND : bool = false;
+
+#[no_mangle]
+pub extern "C" fn DLLBindInit(_in_init_data: FDLLBindInitData) {
+    if unsafe { !INITIALIZED_BIND } {
+        crate::one_time_initialization();
+        unsafe { INITIALIZED_BIND = true };
+    }
+}
+
+#[repr(C)]
+#[allow(non_snake_case)]
+pub struct FDLLBindInitData {
+    Version: u32,
+    ReallocFunctionPtr: u64
+}
+
+#[no_mangle]
+pub extern "stdcall" fn DllMain(_hinst_dll: HINSTANCE, fdw_reason: u32, _lpv_reserved: usize) -> i32 {
     match fdw_reason {
         DLL_PROCESS_ATTACH => {
             dll_attach()

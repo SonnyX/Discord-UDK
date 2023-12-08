@@ -12,6 +12,7 @@ jobs:
     strategy:
       matrix:
         platform: [x86_64, i686]
+        feature: [renegadex, firestorm]
 
     steps:
     - uses: actions/checkout@v3
@@ -19,10 +20,10 @@ jobs:
     - run: cargo install cross
     
     - name: Build
-      run: cross build --verbose --release --target=${{ matrix.platform }}-pc-windows-gnu
+      run: cross build --verbose --release --target=${{ matrix.platform }}-pc-windows-gnu --no-default-features --features ${{ matrix.feature }}
 
     - name: Upload Artifacts
       uses: actions/upload-artifact@v2
       with:
-        name: Discord (${{ matrix.platform }})
+        name: Discord for ${{ matrix.feature }} (${{ matrix.platform }})
         path: target/${{ matrix.platform }}-pc-windows-gnu/release/discord.dll

@@ -7,7 +7,15 @@ use crate::error::Error;
 
 use crate::udk_log::log;
 
+#[cfg(feature = "renegadex")]
 pub const APP_ID: discord_sdk::AppId = 846947824888709160;
+#[cfg(feature = "firestorm")]
+pub const APP_ID: discord_sdk::AppId = 1072347236849172570;
+
+#[cfg(feature = "renegadex")]
+pub const APP_NAME: &'static str = "Renegade X";
+#[cfg(feature = "firestorm")]
+pub const APP_NAME: &'static str = "Firestorm";
 
 pub struct Client {
     pub discord: discord_sdk::Discord,
@@ -26,7 +34,7 @@ pub async fn make_client(subs: discord_sdk::Subscriptions) -> Result<Client, Err
 
     let application = discord_sdk::registration::Application {
         id: APP_ID,
-        name: Some("Renegade X".to_string()),
+        name: Some(APP_NAME.to_string()),
         command: discord_sdk::registration::LaunchCommand::Bin {
             path: current_exe,
             args: vec![]
@@ -103,7 +111,7 @@ pub fn get_runtime() -> &'static mut tokio::runtime::Runtime {
     unsafe { RUNTIME.as_mut().unwrap() }
 }
 
-pub async fn update_presence(in_server_name: String, in_level_name: String, in_player_count: u32, in_max_players: u32, team: String, in_time_elapsed:u32, in_time_remaining: u32, is_firestorm: bool, in_image_name: String) -> Result<(), Error> {
+pub async fn update_presence(in_server_name: String, in_level_name: String, in_player_count: u32, in_max_players: u32, team: String, in_time_elapsed:u32, in_time_remaining: u32, _is_firestorm: bool, in_image_name: String) -> Result<(), Error> {
     if unsafe { !IS_INITIALIZED && CLIENT.is_none() } {
         tracing::warn!("initializing tokio and discord");
         start_discord_rpc().await?;
@@ -115,11 +123,7 @@ pub async fn update_presence(in_server_name: String, in_level_name: String, in_p
 
     if in_level_name == "FrontEndMap" {
         let mut assets = discord_sdk::activity::Assets::default();
-        if !is_firestorm {
-            assets = assets.large("renegadex", Some("Renegade X".to_owned()));
-        } else {
-            assets = assets.large("fs", Some("Firestorm".to_owned()));
-        }
+        assets = assets.large("game_icon", Some(APP_NAME.to_owned()));
 
         let rp = discord_sdk::activity::ActivityBuilder::default()
         .details("Main Menu")
@@ -136,11 +140,7 @@ pub async fn update_presence(in_server_name: String, in_level_name: String, in_p
     let mut assets = discord_sdk::activity::Assets::default();
     assets = assets.large(in_image_name, Some(in_level_name.clone()));
 
-    if !is_firestorm {
-        assets = assets.small(team.to_lowercase(), Some(team));
-    } else {
-        assets = assets.small(format!("ts{}", team.to_lowercase()), Some(team));
-    }
+    assets = assets.small(team.to_lowercase(), Some(team));
 
     let mut rp = discord_sdk::activity::ActivityBuilder::default()
     .details(in_server_name.clone())
